@@ -1,0 +1,51 @@
+{% extends "core/base.html" %}
+{% block title %}Productos - WooCentral{% endblock %}
+{% block content %}
+<section class="box">
+    <h2>Productos ({{ products|length }} mostrados)</h2>
+    <form method="get" class="search-form">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre o SKU...">
+        <select name="category">
+            <option value="">Todas las categorías</option>
+            {% for c in categories %}
+            <option value="{{ c.woo_id }}" {% if selected_category == c.woo_id|stringformat:"s" %}selected{% endif %}>{{ c.name }} ({{ c.count }})</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">Filtrar</button>
+        {% if q or selected_category %}<a href="{% url 'core:products' %}" class="btn secondary">Limpiar</a>{% endif %}
+    </form>
+    {% if products %}
+    <table>
+        <thead>
+            <tr><th></th><th>Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th>Categorías</th><th>Vendidos</th></tr>
+        </thead>
+        <tbody>
+        {% for p in products %}
+            <tr>
+                <td>{% if p.image_url %}<img src="{{ p.image_url }}" class="thumb" alt="">{% endif %}</td>
+                <td>
+                    <a href="{{ p.permalink }}" target="_blank" rel="noopener">{{ p.name|truncatechars:60 }}</a>
+                    {% if p.product_type == 'variable' %}
+                        <span class="badge gray">{{ p.variations.count }} variaciones</span>
+                    {% endif %}
+                </td>
+                <td>{{ p.sku|default:"—" }}</td>
+                <td>{% if p.sale_price %}<s style="color:var(--muted)">€{{ p.regular_price|floatformat:2 }}</s> €{{ p.sale_price|floatformat:2 }}{% else %}€{{ p.price|floatformat:2 }}{% endif %}</td>
+                <td>
+                    {% if p.stock_quantity != none %}
+                        {% if p.stock_quantity <= 5 %}<span class="badge red">{{ p.stock_quantity }}</span>{% else %}{{ p.stock_quantity }}{% endif %}
+                    {% elif p.stock_status == 'outofstock' %}<span class="badge red">Agotado</span>
+                    {% elif p.stock_status == 'onbackorder' %}<span class="badge yellow">Bajo pedido</span>
+                    {% else %}<span class="badge green">Disponible</span>{% endif %}
+                </td>
+                <td>{% for c in p.categories.all %}<span class="badge gray">{{ c.name }}</span> {% empty %}—{% endfor %}</td>
+                <td>{{ p.sold }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted)">No hay productos. Ejecuta una sincronización inicial desde el encabezado.</p>
+    {% endif %}
+</section>
+{% endblock %}

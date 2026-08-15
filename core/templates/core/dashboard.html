@@ -1,0 +1,154 @@
+{% extends "core/base.html" %}
+{% block title %}Dashboard - WooCentral{% endblock %}
+{% block content %}
+{% if last_sync %}
+<section class="box sync-status">
+    Última sincronización:
+    <span class="badge {% if last_sync.status == 'success' %}green{% elif last_sync.status == 'running' %}yellow{% else %}red{% endif %}">
+        {{ last_sync.get_status_display }}
+    </span>
+    {{ last_sync.started_at|date:"d/m/Y H:i" }}
+    {% if last_sync.duration_seconds %}· {{ last_sync.duration_seconds }}s{% endif %}
+    {% if last_sync.message %}· {{ last_sync.message }}{% endif %}
+    {% if last_sync.is_running %}(la página se actualizará automáticamente)<meta http-equiv="refresh" content="5">{% endif %}
+</section>
+{% endif %}
+
+<div class="cards">
+    <div class="card"><div class="value">€{{ kpis.revenue_total|floatformat:2 }}</div><div class="label">Ingresos totales</div></div>
+    <div class="card"><div class="value">€{{ kpis.revenue_30d|floatformat:2 }}</div><div class="label">Ingresos últimos 30 días</div></div>
+    <div class="card"><div class="value">{{ kpis.orders_30d }}</div><div class="label">Pedidos (30 días)</div></div>
+    <div class="card"><div class="value">€{{ kpis.aov|floatformat:2 }}</div><div class="label">Ticket medio (30 días)</div></div>
+    <div class="card"><div class="value">{{ churn.total }}</div><div class="label">Clientes con compra</div></div>
+    <div class="card"><div class="value">{{ churn.churn_rate }}%</div><div class="label">Tasa de churn</div></div>
+</div>
+
+<section class="box">
+    <h2>Ingresos por día (últimos 30 días)</h2>
+    {{ daily|json_script:"data-daily" }}
+    <div class="chart-wrap"><canvas id="chart-daily"></canvas></div>
+</section>
+
+<div class="grid-2">
+    <section class="box">
+        <h2>Ingresos por mes (12 meses)</h2>
+        {{ monthly|json_script:"data-monthly" }}
+        <div class="chart-sm"><canvas id="chart-monthly"></canvas></div>
+    </section>
+
+    <section class="box">
+        <h2>Pedidos por estado</h2>
+        {{ status_chart|json_script:"data-status" }}
+        <div class="chart-sm"><canvas id="chart-status"></canvas></div>
+    </section>
+</div>
+
+<div class="grid-2">
+    <section class="box">
+        <h2>Top 5 productos por ingresos</h2>
+        {{ top_products|json_script:"data-top" }}
+        <div class="chart-sm"><canvas id="chart-top"></canvas></div>
+    </section>
+
+    <section class="box">
+        <h2>Situación de clientes</h2>
+        <div class="cards" style="grid-template-columns: repeat(3, 1fr)">
+            <div class="card"><div class="value" style="color:#116329">{{ churn.activos }}</div><div class="label">Activos (≤60d)</div></div>
+            <div class="card"><div class="value" style="color:#8a6116">{{ churn.riesgo }}</div><div class="label">En riesgo (60–90d)</div></div>
+            <div class="card"><div class="value" style="color:#b32d2e">{{ churn.perdidos }}</div><div class="label">Perdidos (&gt;90d)</div></div>
+        </div>
+        <p style="color:var(--muted);font-size:.85rem;margin-top:.6rem">
+            Recompra: <strong>{{ churn.repeat_rate }}%</strong> · LTV medio: <strong>€{{ churn.avg_ltv|floatformat:2 }}</strong> · Pedidos por cliente: <strong>{{ avg_orders_per_customer }}</strong>
+        </p>
+        <p style="margin-top:1.2rem">
+            <a href="{% url 'core:customers' %}" class="btn secondary">Ver análisis de clientes y churn →</a>
+        </p>
+    </section>
+</div>
+
+<section class="box">
+    <h2>Stock bajo (≤ 5 unidades)</h2>
+    {% if low_stock %}
+    <table>
+        <thead><tr><th>Producto</th><th>SKU</th><th>Stock</th></tr></thead>
+        <tbody>
+        {% for p in low_stock %}
+            <tr><td>{{ p.name|truncatechars:40 }}</td><td>{{ p.sku|default:"—" }}</td><td>{{ p.stock_quantity }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p style="color:var(--muted)">Ningún producto con stock bajo.</p>{% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const PURPLE = '#7f54b3';
+    const eur = v => '€' + v.toLocaleString('es-ES', {maximumFractionDigits: 0});
+    const json = id => JSON.parse(document.getElementById(id).textContent);
+    Chart.defaults.color = '#646970';
+
+    const daily = json('data-daily');
+    new Chart(document.getElementById('chart-daily'), {
+        type: 'line',
+        data: {
+            labels: daily.labels,
+            datasets: [{
+                label: 'Ingresos (€)',
+                data: daily.values,
+                borderColor: PURPLE,
+                backgroundColor: 'rgba(127,84,179,.12)',
+                fill: true,
+                tension: .35,
+                pointRadius: 2
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {legend: {display: false}},
+            scales: {y: {beginAtZero: true, ticks: {callback: v => eur(v)}}}
+        }
+    });
+
+    const monthly = json('data-monthly');
+    new Chart(document.getElementById('chart-monthly'), {
+        type: 'bar',
+        data: {
+            labels: monthly.labels,
+            datasets: [{label: 'Ingresos (€)', data: monthly.values, backgroundColor: PURPLE, borderRadius: 4}]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {legend: {display: false}},
+            scales: {y: {beginAtZero: true, ticks: {callback: v => eur(v)}}}
+        }
+    });
+
+    const statusData = json('data-status');
+    new Chart(document.getElementById('chart-status'), {
+        type: 'doughnut',
+        data: {
+            labels: statusData.labels,
+            datasets: [{
+                data: statusData.values,
+                backgroundColor: ['#116329', '#4aa3df', '#f0a13a', '#7f54b3', '#e05f65', '#8d8f92', '#c3c4c7']
+            }]
+        },
+        options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'right'}}}
+    });
+
+    const topProducts = json('data-top');
+    new Chart(document.getElementById('chart-top'), {
+        type: 'bar',
+        data: {
+            labels: topProducts.map(p => p.name.length > 24 ? p.name.slice(0, 24) + '…' : p.name),
+            datasets: [{label: 'Ingresos (€)', data: topProducts.map(p => p.revenue), backgroundColor: '#4aa3df', borderRadius: 4}]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: {legend: {display: false}},
+            scales: {x: {beginAtZero: true, ticks: {callback: v => eur(v)}}}
+        }
+    });
+</script>
+{% endblock %}

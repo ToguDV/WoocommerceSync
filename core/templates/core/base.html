@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WooCentral{% endblock %}</title>
+    <style>
+        :root { --purple: #7f54b3; --bg: #f6f7f7; --card: #fff; --text: #2c3338; --muted: #646970; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+        header { background: var(--purple); color: #fff; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        header h1 { font-size: 1.3rem; font-weight: 600; }
+        nav a { color: #fff; text-decoration: none; margin-left: 1.5rem; opacity: .85; }
+        nav a:hover, nav a.active { opacity: 1; text-decoration: underline; }
+        main { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .card { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .card .value { font-size: 1.6rem; font-weight: 700; color: var(--purple); }
+        .card .label { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+        section.box { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+        section.box h2 { font-size: 1rem; margin-bottom: .8rem; color: var(--text); }
+        table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+        th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #eee; }
+        th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+        .btn { display: inline-block; background: var(--purple); color: #fff; border: none; padding: .6rem 1.2rem; border-radius: 4px; cursor: pointer; font-size: .9rem; text-decoration: none; }
+        .btn.secondary { background: #fff; color: var(--purple); border: 1px solid var(--purple); }
+        .btn:hover { opacity: .9; }
+        .messages { margin-bottom: 1.5rem; }
+        .messages li { padding: .7rem 1rem; border-radius: 4px; margin-bottom: .4rem; list-style: none; font-size: .9rem; }
+        .messages .success { background: #edfaef; color: #116329; border: 1px solid #b8e6c1; }
+        .messages .warning { background: #fff8e5; color: #8a6116; border: 1px solid #f0d98c; }
+        .messages .error { background: #fcf0f1; color: #b32d2e; border: 1px solid #f1b8b9; }
+        .sync-status { font-size: .85rem; color: var(--muted); }
+        .badge { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+        .badge.green { background: #edfaef; color: #116329; }
+        .badge.red { background: #fcf0f1; color: #b32d2e; }
+        .badge.yellow { background: #fff8e5; color: #8a6116; }
+        .badge.gray { background: #f0f0f1; color: #50575e; }
+        .search-form { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .search-form input, .search-form select { padding: .5rem .7rem; border: 1px solid #c3c4c7; border-radius: 4px; font-size: .9rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+        .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; background: #eee; }
+        .chart-wrap { position: relative; height: 280px; }
+        .chart-sm { position: relative; height: 240px; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>WooCentral</h1>
+    <nav>
+        <a href="{% url 'core:dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+        <a href="{% url 'core:products' %}" {% if request.resolver_match.url_name == 'products' %}class="active"{% endif %}>Productos</a>
+        <a href="{% url 'core:customers' %}" {% if request.resolver_match.url_name == 'customers' %}class="active"{% endif %}>Clientes &amp; Churn</a>
+    </nav>
+    <div>
+        <form method="post" action="{% url 'core:sync' %}" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn secondary" style="border-color:#fff;color:#fff;background:transparent">Sincronizar ahora</button>
+        </form>
+        <form method="post" action="{% url 'core:sync' %}" style="display:inline" onsubmit="return confirm('Esto descargará TODO el catálogo e histórico. ¿Continuar?')">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <input type="hidden" name="initial" value="1">
+            <button type="submit" class="btn">Sync inicial completa</button>
+        </form>
+    </div>
+</header>
+<main>
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+</main>
+<script src="{% static 'core/js/chart.umd.min.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

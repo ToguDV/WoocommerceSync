@@ -1,0 +1,85 @@
+{% extends "core/base.html" %}
+{% block title %}Clientes &amp; Churn - WooCentral{% endblock %}
+{% block content %}
+<div class="cards">
+    <div class="card"><div class="value">{{ churn.total }}</div><div class="label">Clientes totales</div></div>
+    <div class="card"><div class="value" style="color:#116329">{{ churn.activos }}</div><div class="label">Activos (compra ≤60d)</div></div>
+    <div class="card"><div class="value" style="color:#8a6116">{{ churn.riesgo }}</div><div class="label">En riesgo (60–90d)</div></div>
+    <div class="card"><div class="value" style="color:#b32d2e">{{ churn.perdidos }}</div><div class="label">Perdidos (&gt;90d)</div></div>
+    <div class="card"><div class="value">{{ churn.churn_rate }}%</div><div class="label">Tasa de churn</div></div>
+    <div class="card"><div class="value">{{ churn.repeat_rate }}%</div><div class="label">Tasa de recompra</div></div>
+</div>
+
+<div class="grid-2">
+    <section class="box">
+        <h2>Distribución de clientes</h2>
+        {{ churn|json_script:"data-churn-dist" }}
+        <div class="chart-sm"><canvas id="chart-churn"></canvas></div>
+    </section>
+
+    <section class="box">
+        <h2>Nuevos clientes por mes</h2>
+        {{ new_customers|json_script:"data-new-cust" }}
+        <div class="chart-sm"><canvas id="chart-new-cust"></canvas></div>
+    </section>
+</div>
+
+<section class="box">
+    <h2>Detalle de clientes (por gasto total)</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:.6rem">
+        Churn: cliente sin compras en más de 90 días · En riesgo: entre 60 y 90 días · Activo: últimos 60 días
+    </p>
+    {% if customers %}
+    <table>
+        <thead>
+            <tr><th>Cliente</th><th>Pedidos</th><th>Gasto total</th><th>LTV medio</th><th>Primera compra</th><th>Última compra</th><th>Días sin comprar</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+        {% for c in customers %}
+            <tr>
+                <td>{{ c.email }}</td>
+                <td>{{ c.orders }}</td>
+                <td>€{{ c.spend|floatformat:2 }}</td>
+                <td>€{{ c.avg_order|floatformat:2 }}</td>
+                <td>{{ c.first_order|date:"d/m/y" }}</td>
+                <td>{{ c.last_order|date:"d/m/y" }}</td>
+                <td>{{ c.days_since }}</td>
+                <td>
+                    <span class="badge {% if c.state == 'activo' %}green{% elif c.state == 'riesgo' %}yellow{% else %}red{% endif %}">
+                        {{ c.state_label }}
+                    </span>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p style="color:var(--muted)">Aún no hay pedidos con datos de cliente. Genera pedidos ficticios o espera a tener ventas.</p>{% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eur = v => '€' + v.toLocaleString('es-ES', {maximumFractionDigits: 0});
+    const json = id => JSON.parse(document.getElementById(id).textContent);
+
+    const dist = json('data-churn-dist');
+    new Chart(document.getElementById('chart-churn'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Activos (≤60d)', 'En riesgo (60–90d)', 'Perdidos (>90d)'],
+            datasets: [{data: [dist.activos, dist.riesgo, dist.perdidos], backgroundColor: ['#2e9e4f', '#f0a13a', '#e05f65']}]
+        },
+        options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'right'}}}
+    });
+
+    const nc = json('data-new-cust');
+    new Chart(document.getElementById('chart-new-cust'), {
+        type: 'bar',
+        data: {
+            labels: nc.labels,
+            datasets: [{label: 'Nuevos clientes', data: nc.values, backgroundColor: '#7f54b3', borderRadius: 4}]
+        },
+        options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true, ticks: {precision: 0}}}}
+    });
+</script>
+{% endblock %}
